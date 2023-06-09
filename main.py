@@ -25,16 +25,26 @@ class Prediction:
         return - (p_neg * np.log2(p_neg)) - (p_pos * np.log2(p_pos))
 
     def get_entropies_for_feature(self, feature):
-        entropys_per_option = []
+        entropys_per_option = {}
+        ttl_predicted_neg = 0
+        ttl_predicted_pos = 0
         for name, value in self.count_dict[feature].items():
             predicted_neg = value[0]  # negative predicted value when option == name
             predicted_pos = value[1]  # positive predicted value when option == name
-            entropys_per_option.append({name: self.get_entropy(neg_examples=predicted_neg, pos_examples=predicted_pos)})
+            ttl_predicted_neg += predicted_neg
+            ttl_predicted_pos += predicted_pos
+            entropys_per_option[name] = {'entropy': self.get_entropy(neg_examples=predicted_neg, pos_examples=predicted_pos),
+                                         'ttl_for_option': predicted_neg + predicted_pos}
+        entropys_per_option['ttl'] = self.get_entropy(neg_examples=ttl_predicted_neg, pos_examples=ttl_predicted_pos)
         return entropys_per_option
 
 
-    def get_gain(self):
-        pass
+    def get_gain_for_feature(self, entropies):
+        for feature in entropies.values():
+            x = feature['ttl_for_option']
+                    # entropies['ttl'] - (entropies[])
+
+
 #TODO: check if we can assume yes or no in predicted feature
 
     def count_features(self, examples):
@@ -56,5 +66,5 @@ if __name__ == '__main__':
     file_path = 'train.txt'
     p = Prediction(file_path)
     entropies_age = p.get_entropies_for_feature('age')
-
+    p.get_gain_for_feature(entropies_age)
     p = 0
