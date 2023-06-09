@@ -1,48 +1,47 @@
 import pandas as pd
 import numpy as np
-from enum import Enum
 
 
-class A(Enum):
-    pclass = 0
-    age = 1
-    sex = 2
-    survived = 3
+class Prediction:
+
+    def __init__(self, train_data):
+        self.ttl_examples, self.train_examples = self.parse_data(train_data)
+        self.count_dict = self.count_features(self.train_examples)
+
+    def parse_data(self, txt):
+        with open(txt, 'r') as file:
+            lines = file.readlines()
+        data = []
+        header = lines[0].replace("\n", "").split('\t')
+        for line in lines[1:]:
+            values = line.replace("\n", "").split('\t')
+            data.append(dict(zip(header, values)))
+        return len(data), data
+
+    def get_entropy(self, pos_examples, neg_examples):
+        p_neg = neg_examples / self.ttl_examples
+        p_pos = pos_examples / self.ttl_examples
+        return - (p_neg * np.log2(p_neg)) - (p_pos * np.log2(p_pos))
+
+    def get_ttl_entropy(self):
+        self.get_entropy()
+
+    def get_gain(self):
+        pass
+
+    def count_features(self, examples):
+        feature_options = {}
+        for example in examples:
+            for feature, option in example.items():
+                if feature not in feature_options:
+                    feature_options[feature] = {}
+                if option not in feature_options[feature]:
+                    feature_options[feature][option] = 0
+                feature_options[feature][option] += 1
+        return feature_options
 
 
-class Value:
-    def __init__(self, value):
-        self.value = value
-        self.count = 0
-
-
-def parse_data(txt):
-    with open(txt, 'r') as file:
-        lines = file.readlines()
-    data = []
-    header = lines[0].split('\t')
-    for line in lines[1:]:
-        values = line.split('\t')
-        data.append(dict(zip(header, values)))
-    return len(data), data
-
-
-def get_entropy(pos_examples, neg_examples):
-    print(899)
-
-
-def count_examples(feature, options, examples):
-    counters = [0] * len(options)
-    for example in examples:
-        for index, option in enumerate(options):
-            if example[feature] == option:
-                counters[index] += 1
-                continue
-    return counters
-
-#  TODO: extract possible values no hardcode
 if __name__ == '__main__':
     file_path = 'train.txt'
-    ttl_examples, train_examples = parse_data(file_path)
-    age_count = count_examples('age', ("adult", "child"), train_examples)
+    p = Prediction(file_path)
     p = 0
