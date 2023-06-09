@@ -1,0 +1,10 @@
+pclass=crew:no
+pclass=1st:yes
+pclass=2nd
+	|age=child:yes
+	|age=adult
+		|sex=female:yes
+		|sex=male:no
+pclass=3nd
+	|sex=female:yes
+	|sex=male:no
