@@ -25,7 +25,7 @@ class Prediction:
         return - (p_neg * np.log2(p_neg)) - (p_pos * np.log2(p_pos))
 
     def get_entropies_for_feature(self, feature):
-        entropys_per_option = {}
+        feature_entropys = {}
         ttl_predicted_neg = 0
         ttl_predicted_pos = 0
         for name, value in self.count_dict[feature].items():
@@ -33,19 +33,21 @@ class Prediction:
             predicted_pos = value[1]  # positive predicted value when option == name
             ttl_predicted_neg += predicted_neg
             ttl_predicted_pos += predicted_pos
-            entropys_per_option[name] = {'entropy': self.get_entropy(neg_examples=predicted_neg, pos_examples=predicted_pos),
-                                         'ttl_for_option': predicted_neg + predicted_pos}
-        entropys_per_option['ttl'] = self.get_entropy(neg_examples=ttl_predicted_neg, pos_examples=ttl_predicted_pos)
-        return entropys_per_option
+            feature_entropys.setdefault('entropies_per_option', {})[name] = {
+                    'entropy': self.get_entropy(neg_examples=predicted_neg, pos_examples=predicted_pos),
+                    'ttl_count_for_option': predicted_neg + predicted_pos
+                }
+        feature_entropys['ttl_entropy_for_feature'] = self.get_entropy(neg_examples=ttl_predicted_neg,
+                                                                       pos_examples=ttl_predicted_pos)
+        return feature_entropys
 
+    def get_gain_for_feature(self, entropies_for_feature):
+        ttl_feature_gain = entropies_for_feature['ttl_entropy_for_feature']
+        for option in entropies_for_feature.values():
+            ttl_feature_gain -= (option['ttl_count_for_option'] / self.ttl_examples) * option['entropy']
+        return ttl_feature_gain
 
-    def get_gain_for_feature(self, entropies):
-        for feature in entropies.values():
-            x = feature['ttl_for_option']
-                    # entropies['ttl'] - (entropies[])
-
-
-#TODO: check if we can assume yes or no in predicted feature
+    # TODO: check if we can assume yes or no in predicted feature
 
     def count_features(self, examples):
         feature_options = {}
@@ -66,5 +68,6 @@ if __name__ == '__main__':
     file_path = 'train.txt'
     p = Prediction(file_path)
     entropies_age = p.get_entropies_for_feature('age')
-    p.get_gain_for_feature(entropies_age)
+    x = p.get_gain_for_feature(entropies_age)
+    print(x)
     p = 0
