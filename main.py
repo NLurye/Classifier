@@ -3,38 +3,38 @@ import numpy as np
 
 
 class Tree:
-    def __init__(self, attribute=None, value=None):
-        self.attribute = attribute  # Feature associated with the node
-        self.value = value  # Value of the predicted feature (for leaf nodes)
-        self.children = {}  # Dictionary to store child nodes
+    def __init__(self, feature=None, value=None):
+        self.feature = feature
+        self.branch = value
+        self.children = {}
 
     def add_child(self, value, subtree):
         self.children[value] = subtree
 
     def predict(self, example):
-        if self.value is not None:
-            return self.value  # Reached a leaf node, return the predicted value
+        if self.branch is not None:
+            return self.branch  # Reached a leaf, return the predicted value
 
-        attribute_value = example[self.attribute]
-        if attribute_value not in self.children:
-            return None  # Unknown attribute value, return None
+        feature_value = example[self.feature]
+        if feature_value not in self.children:
+            return None  # Unknown feature value, return None
 
-        child_subtree = self.children[attribute_value]
+        child_subtree = self.children[feature_value]
         return child_subtree.predict(example)
 
     def print_tree(self, indent=''):
-        if self.value is not None:
-            print(indent + str(self.value))
+        if self.branch is not None:
+            print(indent + str(self.branch))
             return
 
-        print(indent + str(self.attribute) + ' {')
-        for value, subtree in self.children.items():
-            print(indent + '  ' + str(value) + ':', end=' ')
-            subtree.print_tree(indent + '    ')
+        print(indent + str(self.feature) + ' {')
+        for branch, subtree in self.children.items():
+            print(indent + '├── ' + str(branch) + ':', end=' ')
+            subtree.print_tree(indent + '│   ')
         print(indent + '}')
 
 
-class Prediction:
+class Classifier:
 
     def __init__(self, train_data):
         self.info_gains = None
@@ -66,25 +66,27 @@ class Prediction:
         ttl_predicted_neg = 0
         ttl_predicted_pos = 0
         count_sub_dict = self.count_features(examples)
-        for name, value in count_sub_dict[feature].items():
-            predicted_neg = value[0]  # negative predicted value when option == name
-            predicted_pos = value[1]  # positive predicted value when option == name
+        feature_values = set([example[feature] for example in examples])
+        for value in feature_values:
+            predicted_neg = count_sub_dict[feature][value][0]
+            predicted_pos = count_sub_dict[feature][value][1]
             ttl_predicted_neg += predicted_neg
             ttl_predicted_pos += predicted_pos
-            feature_entropys.setdefault('entropies_per_option', {})[name] = {
+            feature_entropys[value] = {
                 'entropy': self.get_entropy(neg_examples=predicted_neg, pos_examples=predicted_pos),
                 'ttl_count_for_option': predicted_neg + predicted_pos
             }
-            feature_entropys['entropies_per_option'][name]['pure'] = \
-                True if feature_entropys['entropies_per_option'][name]['entropy'] == 0 else False
         feature_entropys['ttl_entropy_for_feature'] = self.get_entropy(neg_examples=ttl_predicted_neg,
                                                                        pos_examples=ttl_predicted_pos)
         return feature_entropys
 
     def get_gain_for_feature(self, entropies_for_feature):
         ttl_feature_gain = entropies_for_feature['ttl_entropy_for_feature']
-        for option in entropies_for_feature['entropies_per_option'].values():
-            ttl_feature_gain -= (option['ttl_count_for_option'] / self.ttl_examples) * option['entropy']
+        for option in entropies_for_feature.values():
+            if isinstance(option, dict):
+                option_count = option['ttl_count_for_option']
+                option_entropy = option['entropy']
+                ttl_feature_gain -= (option_count / self.ttl_examples) * option_entropy
         return ttl_feature_gain
 
     def calc_entropies_for_all(self, features, examples):
@@ -126,33 +128,33 @@ class Prediction:
         self.tree = self.build_tree(self.train_examples, self.info_gains)
 
     def build_tree(self, examples, info_gains):
-        feature_to_predict = self.feature_to_predict
-        if len(set([example[feature_to_predict] for example in examples])) == 1:
+        if len(set([example[self.feature_to_predict] for example in examples])) == 1:
             # All examples have the same value for the predicted feature
-            return Tree(value=examples[0][feature_to_predict])
+            return Tree(value=examples[0][self.feature_to_predict])
 
         if len(examples[0]) == 1:
             # No more features to split on
-            predicted_feature_values = [example[feature_to_predict] for example in examples]
+            predicted_feature_values = [example[self.feature_to_predict] for example in examples]
             most_common_value = max(set(predicted_feature_values), key=predicted_feature_values.count)
             return Tree(value=most_common_value)
 
         best_feature = self.get_most_informative(info_gains)
-        tree = Tree(attribute=best_feature)
+        updated_gains = info_gains.copy()
+        del updated_gains[best_feature]
+        tree = Tree(feature=best_feature)
 
         feature_values = set([example[best_feature] for example in examples])
-        for value in feature_values:
-            filtered_examples = [example for example in examples if example[best_feature] == value]
+
+        for option in feature_values:
+            filtered_examples = [example for example in examples if example[best_feature] == option]
             if len(filtered_examples) == 0:
                 # No examples with this feature value
-                predicted_feature_values = [example[feature_to_predict] for example in examples]
+                predicted_feature_values = [example[self.feature_to_predict] for example in examples]
                 most_common_value = max(set(predicted_feature_values), key=predicted_feature_values.count)
                 subtree = Tree(value=most_common_value)
             else:
-                updated_gains = info_gains.copy()
-                del updated_gains[best_feature]
                 subtree = self.build_tree(filtered_examples, updated_gains)
-            tree.add_child(value, subtree)
+            tree.add_child(option, subtree)
 
         return tree
 
@@ -160,7 +162,7 @@ class Prediction:
 
 if __name__ == '__main__':
     file_path = 'test2.txt'
-    p = Prediction(file_path)
+    p = Classifier(file_path)
     p.make_tree()
     p.tree.print_tree()
     pass
