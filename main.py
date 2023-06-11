@@ -1,4 +1,3 @@
-import pandas as pd
 import numpy as np
 
 
@@ -139,8 +138,9 @@ class Classifier:
             return Tree(value=most_common_value)
 
         best_feature = self.get_most_informative(info_gains)
-        updated_gains = info_gains.copy()
-        del updated_gains[best_feature]
+        filtered_features = list(info_gains.keys())
+        filtered_features.remove(best_feature)
+
         tree = Tree(feature=best_feature)
 
         feature_values = set([example[best_feature] for example in examples])
@@ -153,6 +153,7 @@ class Classifier:
                 most_common_value = max(set(predicted_feature_values), key=predicted_feature_values.count)
                 subtree = Tree(value=most_common_value)
             else:
+                updated_gains = self.calc_gain_for_all(filtered_features, filtered_examples)
                 subtree = self.build_tree(filtered_examples, updated_gains)
             tree.add_child(option, subtree)
 
