@@ -36,6 +36,7 @@ class Tree:
 class Classifier:
 
     def __init__(self, train_data):
+        self.features = None
         self.info_gains = None
         self.all_entropies = None
         self.feature_to_predict, self.ttl_examples, self.train_examples = self.parse_data(train_data)
@@ -120,26 +121,30 @@ class Classifier:
     def get_most_informative(self, gains):
         return max(gains, key=gains.get)
 
+    def mode(self, values):
+        max(set(values), key=values.count)
+
     def make_tree(self):
         features = list(self.count_dict.keys())
         self.all_entropies = self.calc_entropies_for_all(features, self.train_examples)
         self.info_gains = self.calc_gain_for_all(features, self.train_examples)
-        self.tree = self.build_tree(self.train_examples, self.info_gains)
+        self.features = list(self.info_gains.keys())
+        self.tree = self.build_tree(self.train_examples, self.info_gains, None)
 
-    def build_tree(self, examples, info_gains):
+    def build_tree(self, examples, info_gains, default):
+        # Examples is empty return default
+        if len(examples) == 0:
+            return default
+        # All examples have the same classification - return classification
         if len(set([example[self.feature_to_predict] for example in examples])) == 1:
-            # All examples have the same value for the predicted feature
             return Tree(value=examples[0][self.feature_to_predict])
-
-        if len(examples[0]) == 1:
-            # No more features to split on
+        # No more features to split on
+        if len(info_gains) == 1:
             predicted_feature_values = [example[self.feature_to_predict] for example in examples]
-            most_common_value = max(set(predicted_feature_values), key=predicted_feature_values.count)
+            most_common_value = self.mode(predicted_feature_values)
             return Tree(value=most_common_value)
 
         best_feature = self.get_most_informative(info_gains)
-        filtered_features = list(info_gains.keys())
-        filtered_features.remove(best_feature)
 
         tree = Tree(feature=best_feature)
 
@@ -147,14 +152,16 @@ class Classifier:
 
         for option in feature_values:
             filtered_examples = [example for example in examples if example[best_feature] == option]
+            predicted_feature_values = [example[self.feature_to_predict] for example in examples]
             if len(filtered_examples) == 0:
                 # No examples with this feature value
-                predicted_feature_values = [example[self.feature_to_predict] for example in examples]
-                most_common_value = max(set(predicted_feature_values), key=predicted_feature_values.count)
+                most_common_value = self.mode(predicted_feature_values)
                 subtree = Tree(value=most_common_value)
             else:
-                updated_gains = self.calc_gain_for_all(filtered_features, filtered_examples)
-                subtree = self.build_tree(filtered_examples, updated_gains)
+                if best_feature in self.features:
+                    self.features.remove(best_feature)
+                updated_gains = self.calc_gain_for_all(self.features, filtered_examples)
+                subtree = self.build_tree(filtered_examples, updated_gains, self.mode(predicted_feature_values))
             tree.add_child(option, subtree)
 
         return tree
