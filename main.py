@@ -95,9 +95,9 @@ class Classifier:
         return all_entropies
 
     def calc_gain_for_all(self, features, examples):
-        self.calc_entropies_for_all(features, examples)
+        new_entropies = self.calc_entropies_for_all(features, examples)
         info_gains = {}
-        for feature, entropies in self.all_entropies.items():
+        for feature, entropies in new_entropies.items():
             info_gains[feature] = self.get_gain_for_feature(entropies_for_feature=entropies)
         return info_gains
     # TODO: check if we can assume yes or no in predicted feature
