@@ -5,10 +5,10 @@ Overcast	Hot	High	Weak	Yes
 Rain	Mild	High	Weak	Yes
 Rain	Cool	Normal	Weak	Yes
 Rain	Cool	Normal	Strong	no
-Overcast	Cool	Normal	Strong	Yes
+Overcast	Cool	Normal	Weak	Yes
 Sunny	Mild	High	Weak	no
 Sunny	Cool	Normal	Weak	Yes
-Rain	Mild	Normal	Weak	Yes
+Rain	Mild	Normal	Strong	Yes
 Sunny	Mild	Normal	Strong	Yes
 Overcast	Mild	High	Strong	Yes
 Overcast	Hot	Normal	Weak	Yes
