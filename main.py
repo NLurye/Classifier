@@ -23,14 +23,12 @@ class Tree:
 
     def print_tree(self, indent=''):
         if self.branch is not None:
-            print(indent + str(self.branch))
+            print(indent + self.branch)
             return
 
-        print(indent + str(self.feature) + ' {')
         for branch, subtree in self.children.items():
-            print(indent + '├── ' + str(branch) + ':', end=' ')
-            subtree.print_tree(indent + '│   ')
-        print(indent + '}')
+            print(indent + self.feature + ' = ' + str(branch) + ':')
+            subtree.print_tree(indent + '\t' + '\t\t')
 
 
 class Classifier:
@@ -112,7 +110,7 @@ class Classifier:
                         feature_options[feature] = {}
                     if option not in feature_options[feature]:
                         feature_options[feature][option] = [0, 0]
-                    if example[self.feature_to_predict] == 'no' or example[self.feature_to_predict] == '0':
+                    if example[self.feature_to_predict] == 'No' or example[self.feature_to_predict] == 'no':
                         feature_options[feature][option][0] += 1
                     else:
                         feature_options[feature][option][1] += 1
