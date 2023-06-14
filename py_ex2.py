@@ -147,10 +147,10 @@ class Classifier:
             bayes_prediction = self.bayes_model.predict(example)
             self.predicted['tree'].append(tree_prediction)
             self.predicted['naive'].append(bayes_prediction)
-            file.write(str(tree_prediction) + ' ' + str(bayes_prediction) + '\n')
+            file.write(str(tree_prediction) + '\t' + str(bayes_prediction) + '\n')
         tree_acc = round(self.get_accuracy(self.predicted["tree"]), 2)
         naive_acc = round(self.get_accuracy(self.predicted["naive"]), 2)
-        file.write(str(tree_acc) + ' ' + str(naive_acc) + '\n')
+        file.write(str(tree_acc) + '\t' + str(naive_acc) + '\n')
 
     def get_entropy(self, neg_examples, pos_examples):
         ttl_examples = neg_examples + pos_examples
@@ -286,8 +286,8 @@ def train_and_evaluate(train_data, test_data, out_tree_file, output):
 if __name__ == "__main__":
     train_file = 'train.txt'
     test_file = 'test.txt'
-    out_tree = 'my_output_tree.txt'
-    out = 'my_output.txt'
+    out_tree = 'output_tree.txt'
+    out = 'output.txt'
 
 
     train_and_evaluate(train_data=train_file, test_data=test_file, out_tree_file=out_tree, output=out)
