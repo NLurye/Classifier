@@ -1,18 +1,21 @@
 import numpy as np
+
 np.random.seed(0)
 
+
 class NaiveBayes:
-    def __init__(self):
+    def __init__(self, counts):
         self.label_probabilities = None
         self.feature_probabilities = None
+        self.counts_dic = counts
 
-    def fit(self, features, labels):
-        self.label_probabilities, self.feature_probabilities = self.naive_bayes(features, labels)
+    def fit(self, examples, labels):
+        self.label_probabilities, self.feature_probabilities = self.calc_probs(examples, labels)
 
     def predict(self, instance):
         return self.classify_naive_bayes(instance)
 
-    def naive_bayes(self, features, labels):
+    def calc_probs(self, examples, labels):
         label_counts = {}
         for label in labels:
             if label in label_counts:
@@ -25,22 +28,21 @@ class NaiveBayes:
             label_probabilities[label] = count / len(labels)
 
         feature_probabilities = {}
-        num_features = len(features[0])
-        for feature_index in range(num_features):
-            feature_probabilities[feature_index] = {}
-            unique_feature_values = set(row[feature_index] for row in features)
-            for feature_value in unique_feature_values:
-                feature_probabilities[feature_index][feature_value] = {}
-                for label in label_counts:
-                    feature_label_count = sum(
-                        1 for row, classification in zip(features, labels)
-                        if row[feature_index] == feature_value and classification == label)
-                    feature_label_probability = feature_label_count / label_counts[label]
-                    feature_probabilities[feature_index][feature_value][label] = feature_label_probability
+        for feature, options in self.counts_dic.items():
+            feature_probabilities[feature] = {}
+            total_neg = sum(option[0] for option in options.values())
+            total_pos = sum(option[1] for option in options.values())
+
+            for option, counts in options.items():
+                feature_probabilities[feature][option] = {
+                    counts[0] / total_neg,
+                    counts[1] / total_pos
+                }
+        pass
 
         return label_probabilities, feature_probabilities
 
-    def classify_naive_bayes(self, instance):
+    def predict(self, instance):
         predicted_label = None
         max_probability = 0.0
 
@@ -48,8 +50,8 @@ class NaiveBayes:
             instance_probability = label_probability
             for feature_index, feature_value in enumerate(instance):
                 if (
-                    feature_index in self.feature_probabilities
-                    and feature_value in self.feature_probabilities[feature_index]
+                        feature_index in self.feature_probabilities
+                        and feature_value in self.feature_probabilities[feature_index]
                 ):
                     feature_label_probabilities = self.feature_probabilities[feature_index][feature_value]
                     if label in feature_label_probabilities:
@@ -60,7 +62,6 @@ class NaiveBayes:
                 predicted_label = label
 
         return predicted_label
-
 
 
 class Tree:
@@ -102,13 +103,21 @@ class Tree:
 
 class Classifier:
 
-    def __init__(self, train_data):
-        self.info_gains = None
-        self.all_entropies = None
+    def __init__(self, train_data, test_data):
+        # preprocess data
         self.feature_to_predict, self.ttl_examples, self.train_examples = self.parse_data(train_data)
         self.count_dict = self.count_features(self.train_examples)
+        self.set_test_data(test_data)
+
+        self.true_labels = []
+        self.info_gains = None
+        self.all_entropies = None
         self.tree = Tree()
-        self.bayes_model = NaiveBayes()
+        self.bayes_model = NaiveBayes(counts=self.count_dict)
+
+        # train models
+        self.make_tree()
+        self.bayes_model.fit(examples=self.train_examples, labels=self.get_labels(self.train_examples))
 
     def parse_data(self, txt, test=False):
         with open(txt, 'r') as file:
@@ -118,19 +127,33 @@ class Classifier:
         for line in lines[1:]:
             values = line.replace("\n", "").split('\t')
             if test:
-                values.pop()
+                self.true_labels.append(values.pop())
             data.append(dict(zip(header, values)))
         return header[-1], len(data), data
+
+    def get_labels(self, examples):
+        last_column = []
+        for dictionary in examples:
+            values = list(dictionary.values())
+            last_value = values[-1]  # Extract the last value from the dictionary
+            last_column.append(last_value)
+        return last_column
 
     def set_test_data(self, test_file):
         feature_to_predict, ttl_examples, self.test_dict = self.parse_data(test_file, test=True)
 
     def predict_on_test_data(self, file):
-        with open(file, 'w') as f:
-            for example in self.test_dict:
-                tree_prediction = self.tree.predict(example)
-                bayes_prediction = self.bayes_model.predict(example)
-                f.write(str(tree_prediction) + ' ' + str(bayes_prediction) + '\n')
+        self.predicted = {"tree": [], "naive": []}
+        for example in self.test_dict:
+            tree_prediction = self.tree.predict(example)
+            bayes_prediction = self.bayes_model.predict(example)
+            self.predicted['tree'].append(tree_prediction)
+            self.predicted['naive'].append(bayes_prediction)
+            file.write(str(tree_prediction) + ' ' + str(bayes_prediction) + '\n')
+        tree_acc = self.get_accuracy(self.predicted["tree"])
+        naive_acc = self.get_accuracy(self.predicted["naive"])
+        file.write(str(tree_acc) + ' ' + str(naive_acc) + '\n')
+
 
     def get_entropy(self, neg_examples, pos_examples):
         ttl_examples = neg_examples + pos_examples
@@ -206,6 +229,7 @@ class Classifier:
             return 'Yes'
         else:
             return 'No'
+
     def make_tree(self):
         features = list(self.count_dict.keys())
         self.all_entropies = self.calc_entropies_for_all(features, self.train_examples)
@@ -249,41 +273,26 @@ class Classifier:
 
         return tree
 
-    def get_accuracy(self, predicted_labels, true_labels):
-        correct_count = sum(1 for pred, true in zip(predicted_labels, true_labels) if pred == true)
+    def get_accuracy(self, predicted_labels):
+        correct_count = sum(1 for pred, true in zip(predicted_labels, self.true_labels) if pred == true)
         return correct_count / len(predicted_labels)
 
-    def evaluate(self, file):
-        true_labels = [example[self.feature_to_predict] for example in self.test_dict]
 
-        # Evaluate decision tree
-        tree_predictions = [self.tree.predict(example) for example in self.test_dict]
-        tree_accuracy = self.get_accuracy(tree_predictions, true_labels)
+def train_and_evaluate(train_data, test_data, out_tree_file, output):
+    c = Classifier(train_data, test_data)   # set data for train & test and build both models
+    with open(out_tree_file, "w") as file1:  # print tree
+        c.tree.print_tree(file=file1)
+    with open(output, "w") as file2:  # print predictions of both and accuracy
+        c.predict_on_test_data(file=file2)
 
-        # Fit Naive Bayes model
-        self.bayes_model.fit(self.train_examples, self.feature_to_predict)
 
-        # Evaluate Naive Bayes
-        bayes_predictions = [self.bayes_model.predict(example) for example in self.test_dict]
-        bayes_accuracy = self.get_accuracy(bayes_predictions, true_labels)
-
-        # Write predictions and accuracies to file
-        with open(file, 'w') as f:
-            for tree_pred, bayes_pred in zip(tree_predictions, bayes_predictions):
-                f.write(f"{tree_pred}\t{bayes_pred}\n")
-            f.write(f"Decision Tree Accuracy: {tree_accuracy}\n")
-            f.write(f"Naive Bayes Accuracy: {bayes_accuracy}\n")
-def tree_train_and_evaluate():
-    pass
 if __name__ == "__main__":
     train_file = 'test2.txt'
     test_file = 'test2.txt'
-    p = Classifier(train_file)
-    p.set_test_data(test_file)
-    p.make_tree()
-    with open('my_output_tree.txt', "w") as file:
-        p.tree.print_tree(file=file)
-    p.predict_on_test_data(file='my_output.txt')
-    # label_probabilities, feature_probabilities = p.naive_base(features, feature_names, labels)
-    # predicted_label = p.classify_naive_base(label_probabilities, feature_probabilities, p.test_dict)
-    p.evaluate(output_prediction_path)
+    out_tree = 'my_output_tree.txt'
+    out = 'my_output.txt'
+
+    train_and_evaluate(train_data=train_file, test_data=test_file, out_tree_file=out_tree, output=out)
+
+# TODO: partof predict_on_test_data
+# p.evaluate(output_prediction_path)
