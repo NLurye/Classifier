@@ -9,13 +9,10 @@ class NaiveBayes:
         self.feature_probabilities = None
         self.counts_dic = counts
 
-    def fit(self, examples, labels):
-        self.label_probabilities, self.feature_probabilities = self.calc_probs(examples, labels)
+    def fit(self, labels):
+        self.label_probabilities, self.feature_probabilities = self.calc_probs(labels)
 
-    def predict(self, instance):
-        return self.classify_naive_bayes(instance)
-
-    def calc_probs(self, examples, labels):
+    def calc_probs(self, labels):
         label_counts = {}
         for label in labels:
             if label in label_counts:
@@ -152,7 +149,6 @@ class Classifier:
         naive_acc = round(self.get_accuracy(self.predicted["naive"]), 2)
         file.write(str(tree_acc) + ' ' + str(naive_acc) + '\n')
 
-
     def get_entropy(self, neg_examples, pos_examples):
         ttl_examples = neg_examples + pos_examples
         if neg_examples == 0 or pos_examples == 0:
@@ -277,7 +273,7 @@ class Classifier:
 
 
 def train_and_evaluate(train_data, test_data, out_tree_file, output):
-    c = Classifier(train_data, test_data)   # set data for train & test and build both models
+    c = Classifier(train_data, test_data)  # set data for train & test and build both models
     with open(out_tree_file, "w") as file1:  # print tree
         c.tree.print_tree(file=file1)
     with open(output, "w") as file2:  # print predictions of both and accuracy
@@ -291,4 +287,3 @@ if __name__ == "__main__":
     out = 'my_output.txt'
 
     train_and_evaluate(train_data=train_file, test_data=test_file, out_tree_file=out_tree, output=out)
-
