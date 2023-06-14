@@ -35,8 +35,8 @@ class NaiveBayes:
             for option, counts in options.items():
                 # smoothing
                 feature_probabilities[feature][option] = {
-                    (counts[0] + 1) / (total_neg + len(options)),
-                    (counts[1] + 1) / (total_pos + len(options))
+                    list(label_counts.keys())[0]: (counts[0] + 1) / (total_neg + len(options)),
+                    list(label_counts.keys())[1]: (counts[1] + 1) / (total_pos + len(options))
                 }
 
         return label_probabilities, feature_probabilities
@@ -48,12 +48,12 @@ class NaiveBayes:
         for label, label_probability in self.label_probabilities.items():
             posteriori = math.log(label_probability)
 
-            for feature_index, feature_value in enumerate(instance):
+            for feature_name, feature_value in instance.items():
                 if (
-                        feature_index in self.feature_probabilities
-                        and feature_value in self.feature_probabilities[feature_index]
+                        feature_name in self.feature_probabilities
+                        and feature_value in self.feature_probabilities[feature_name]
                 ):
-                    likelihood = self.feature_probabilities[feature_index][feature_value][label]
+                    likelihood = self.feature_probabilities[feature_name][feature_value][label]
                     posteriori += math.log(likelihood)
 
             if posteriori > max_posteriori:
@@ -123,6 +123,7 @@ class Classifier:
         header = lines[0].replace("\n", "").split('\t')
         for line in lines[1:]:
             values = line.replace("\n", "").split('\t')
+            values[-1] = values[-1].lower()
             if test:
                 self.true_labels.append(values.pop())
             data.append(dict(zip(header, values)))
@@ -219,12 +220,12 @@ class Classifier:
         return max(gains, key=gains.get)
 
     def mode(self, values):
-        n_yes = values.count('Yes') + values.count('yes')
-        n_no = values.count('No') + values.count('no')
+        n_yes = values.count('yes')
+        n_no = values.count('no')
         if n_yes >= n_no:
-            return 'Yes'
+            return 'yes'
         else:
-            return 'No'
+            return 'no'
 
     def make_tree(self):
         features = list(self.count_dict.keys())
@@ -283,9 +284,10 @@ def train_and_evaluate(train_data, test_data, out_tree_file, output):
 
 
 if __name__ == "__main__":
-    train_file = 'test2.txt'
-    test_file = 'test2.txt'
+    train_file = 'train.txt'
+    test_file = 'test.txt'
     out_tree = 'my_output_tree.txt'
     out = 'my_output.txt'
+
 
     train_and_evaluate(train_data=train_file, test_data=test_file, out_tree_file=out_tree, output=out)
