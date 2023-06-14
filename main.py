@@ -30,13 +30,20 @@ class Tree:
         return child_subtree.predict(example)
 
     def print_tree(self, file, indent=''):
-        if self.branch is not None:
-            print(indent + self.branch)
-            return
-
         for branch, subtree in self.children.items():
-            print(indent + self.feature + ' = ' + str(branch) + ':')
-            subtree.print_tree(file, indent + '\t' + '\t\t')
+            if indent == '':
+                print(indent + self.feature + '=' + str(branch), end="")
+                file.write(indent + self.feature + '=' + str(branch))
+            else:
+                print(indent + '|' + self.feature + '=' + str(branch), end="")
+                file.write(indent + '|' + self.feature + '=' + str(branch))
+            if subtree.branch in ['Yes', 'yes', 'no', 'No']:
+                print(':' + subtree.branch + '\n', end="")
+                file.write(':' + subtree.branch + '\n')
+            else:
+                print('\n', end="")
+                file.write('\n')
+                subtree.print_tree(file, indent + '\t')
 
 
 class Classifier:
@@ -139,32 +146,31 @@ class Classifier:
         return max(gains, key=gains.get)
 
     def mode(self, values):
-        n_yes = values.count('Yes')
-        n_no = values.count('no')
+        n_yes = values.count('Yes') + values.count('yes')
+        n_no = values.count('No') + values.count('no')
         if n_yes >= n_no:
             return 'Yes'
         else:
-            return 'no'
-
+            return 'No'
     def make_tree(self):
         features = list(self.count_dict.keys())
         self.all_entropies = self.calc_entropies_for_all(features, self.train_examples)
         self.info_gains = self.calc_gain_for_all(features, self.train_examples)
         features = list(self.info_gains.keys())
-        self.tree, _ = self.build_tree(self.train_examples, self.info_gains, None, features)
+        self.tree = self.build_tree(self.train_examples, self.info_gains, None, features)
 
     def build_tree(self, examples, info_gains, default, features):
         # Examples is empty return default
         if len(examples) == 0:
-            return default, features
+            return default
         # All examples have the same classification - return classification
         if len(set([example[self.feature_to_predict] for example in examples])) == 1:
-            return Tree(value=examples[0][self.feature_to_predict]), features
+            return Tree(value=examples[0][self.feature_to_predict])
         # No more features to split on
         if len(info_gains) == 1:
             predicted_feature_values = [example[self.feature_to_predict] for example in examples]
             most_common_value = self.mode(predicted_feature_values)
-            return Tree(value=most_common_value), features
+            return Tree(value=most_common_value)
 
         best_feature = self.get_most_informative(info_gains)
 
@@ -184,19 +190,77 @@ class Classifier:
                     features.remove(best_feature)
                 updated_gains = self.calc_gain_for_all(features, filtered_examples)
                 default = self.mode(predicted_feature_values)
-                subtree, features = self.build_tree(filtered_examples, updated_gains, default, features)
+                subtree = self.build_tree(filtered_examples, updated_gains, default, list(features))
             tree.add_child(option, subtree)
 
-        return tree, features
+        return tree
+
+    def read_data(self, file_path):
+        features = []
+        labels = []
+        with open(file_path, 'r') as file:
+            lines = file.readlines()
+            feature_names = lines[0].strip().split('\t')
+            for line in lines[1:]:
+                values = line.strip().split('\t')
+                feature_values = values[:-1]
+                label = values[-1]
+                features.append(feature_values)
+                labels.append(label)
+        return feature_names, features, labels
+
+    def naive_bayes(self, data, feature_names, labels):
+        label_counts = {}
+        for label in labels:
+            if label in label_counts:
+                label_counts[label] += 1
+            else:
+                label_counts[label] = 1
+        label_probabilities = {}
+        for label, count in label_counts.items():
+            label_probabilities[label] = count / len(labels)
+        feature_probabilities = {}
+        num_features = len(feature_names) - 1
+        for feature_index in range(num_features):
+            feature_name = feature_names[feature_index]
+            feature_probabilities[feature_name] = {}
+            unique_feature_values = set(row[feature_index] for row in data)
+            for feature_value in unique_feature_values:
+                feature_probabilities[feature_name][feature_value] = {}
+                for label in label_counts:
+                    feature_label_count = sum(
+                        1 for row, classification in zip(data, labels)
+                        if row[feature_index] == feature_value and classification == label)
+                    feature_label_probability = feature_label_count / label_counts[label]
+                    feature_probabilities[feature_name][feature_value][label] = feature_label_probability
+        return label_probabilities, feature_probabilities
+
+    def classify_naive_bayes(self, label_probabilities, feature_probabilities, instance):
+        predicted_label = None
+        max_probability = 0.0
+        for label, label_probability in label_probabilities.items():
+            instance_probability = label_probability
+            for feature_name, feature_value in instance.items():  # Calculate the probability of each label
+                if feature_name in feature_probabilities and feature_value in feature_probabilities[feature_name]:
+                    feature_label_probabilities = feature_probabilities[feature_name][feature_value]
+                    if label in feature_label_probabilities:
+                        instance_probability *= feature_label_probabilities[label]
+            if instance_probability > max_probability:
+                max_probability = instance_probability
+                predicted_label = label
+        return predicted_label
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     train_file = 'test2.txt'
     p = Classifier(train_file)
     test_file = 'test2.txt'
+    feature_names, features, labels = p.read_data(train_file)
     p.set_test_data(test_file)
     p.make_tree()
-    p.tree.print_tree(file='my_output_tree.txt')
-    # p.predict_on_test_data(file='my_output.txt')
-    pass
+    with open('my_output_tree.txt', "w") as file:
+        p.tree.print_tree(file=file)
+    p.predict_on_test_data(file='my_output.txt')
+    # label_probabilities, feature_probabilities = p.naive_base(features, feature_names, labels)
+    # predicted_label = p.classify_naive_base(label_probabilities, feature_probabilities, p.test_dict)
 
