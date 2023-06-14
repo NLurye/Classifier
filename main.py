@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 
 np.random.seed(0)
@@ -31,31 +33,31 @@ class NaiveBayes:
             total_pos = sum(option[1] for option in options.values())
 
             for option, counts in options.items():
+                # smoothing
                 feature_probabilities[feature][option] = {
-                    counts[0] / total_neg,
-                    counts[1] / total_pos
+                    (counts[0] + 1) / (total_neg + len(options)),
+                    (counts[1] + 1) / (total_pos + len(options))
                 }
-        pass
 
         return label_probabilities, feature_probabilities
 
     def predict(self, instance):
         predicted_label = None
-        max_probability = 0.0
+        max_posteriori = -math.inf
 
         for label, label_probability in self.label_probabilities.items():
-            instance_probability = label_probability
+            posteriori = math.log(label_probability)
+
             for feature_index, feature_value in enumerate(instance):
                 if (
                         feature_index in self.feature_probabilities
                         and feature_value in self.feature_probabilities[feature_index]
                 ):
-                    feature_label_probabilities = self.feature_probabilities[feature_index][feature_value]
-                    if label in feature_label_probabilities:
-                        instance_probability *= feature_label_probabilities[label]
+                    likelihood = self.feature_probabilities[feature_index][feature_value][label]
+                    posteriori += math.log(likelihood)
 
-            if instance_probability > max_probability:
-                max_probability = instance_probability
+            if posteriori > max_posteriori:
+                max_posteriori = posteriori
                 predicted_label = label
 
         return predicted_label
@@ -112,7 +114,7 @@ class Classifier:
         self.bayes_model = NaiveBayes(counts=self.count_dict)
         # train models
         self.make_tree()
-        self.bayes_model.fit(examples=self.train_examples, labels=self.get_labels(self.train_examples))
+        self.bayes_model.fit(labels=self.get_labels(self.train_examples))
 
     def parse_data(self, txt, test=False):
         with open(txt, 'r') as file:
