@@ -104,17 +104,15 @@ class Tree:
 class Classifier:
 
     def __init__(self, train_data, test_data):
+        self.true_labels = []
         # preprocess data
         self.feature_to_predict, self.ttl_examples, self.train_examples = self.parse_data(train_data)
         self.count_dict = self.count_features(self.train_examples)
         self.set_test_data(test_data)
-
-        self.true_labels = []
         self.info_gains = None
         self.all_entropies = None
         self.tree = Tree()
         self.bayes_model = NaiveBayes(counts=self.count_dict)
-
         # train models
         self.make_tree()
         self.bayes_model.fit(examples=self.train_examples, labels=self.get_labels(self.train_examples))
@@ -150,8 +148,8 @@ class Classifier:
             self.predicted['tree'].append(tree_prediction)
             self.predicted['naive'].append(bayes_prediction)
             file.write(str(tree_prediction) + ' ' + str(bayes_prediction) + '\n')
-        tree_acc = self.get_accuracy(self.predicted["tree"])
-        naive_acc = self.get_accuracy(self.predicted["naive"])
+        tree_acc = round(self.get_accuracy(self.predicted["tree"]), 2)
+        naive_acc = round(self.get_accuracy(self.predicted["naive"]), 2)
         file.write(str(tree_acc) + ' ' + str(naive_acc) + '\n')
 
 
@@ -294,5 +292,3 @@ if __name__ == "__main__":
 
     train_and_evaluate(train_data=train_file, test_data=test_file, out_tree_file=out_tree, output=out)
 
-# TODO: partof predict_on_test_data
-# p.evaluate(output_prediction_path)
