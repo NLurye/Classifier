@@ -152,14 +152,24 @@ class Classifier:
         naive_acc = round(self.get_accuracy(self.predicted["naive"]), 2)
         file.write(str(tree_acc) + '\t' + str(naive_acc) + '\n')
 
+    '''
+    given amounts of neg and pos examples where specific feature = specific option
+    return entropy
+    '''
     def get_entropy(self, neg_examples, pos_examples):
         ttl_examples = neg_examples + pos_examples
         if neg_examples == 0 or pos_examples == 0:
             return 0.0  # Return 0 entropy for zero examples
-        p_neg = neg_examples / ttl_examples
-        p_pos = pos_examples / ttl_examples
+        p_neg = neg_examples / ttl_examples  # positive proportion
+        p_pos = pos_examples / ttl_examples  # negative proportion
         return - (p_neg * np.log2(p_neg)) - (p_pos * np.log2(p_pos))
 
+    '''
+    given feature and list of relevant examples
+    count per option neg/pos examples (on predicted feature) and save the entropy
+    count once amount of neg/pos examples for feature (all examples) and save the entropy
+    return dict[feature_name] -> {'entropy': x, 'ttl_count_for_option': y}
+    '''
     def get_entropies_for_feature(self, feature, examples):
         feature_entropys = {}
         ttl_predicted_neg = 0
@@ -173,19 +183,24 @@ class Classifier:
             ttl_predicted_pos += predicted_pos
             feature_entropys[value] = {
                 'entropy': self.get_entropy(neg_examples=predicted_neg, pos_examples=predicted_pos),
-                'ttl_count_for_option': predicted_neg + predicted_pos
+                'ttl_count_for_option': predicted_neg + predicted_pos  # for future proportion calculation
             }
         feature_entropys['ttl_entropy_for_feature'] = self.get_entropy(neg_examples=ttl_predicted_neg,
                                                                        pos_examples=ttl_predicted_pos)
+        feature_entropys['ttl_count_for_feature'] = ttl_predicted_neg + ttl_predicted_pos
         return feature_entropys
 
+    '''
+    given dict (for specific feature) with entropy per option and one ttl entropy
+    return gain for this feature
+    '''
     def get_gain_for_feature(self, entropies_for_feature):
         ttl_feature_gain = entropies_for_feature['ttl_entropy_for_feature']
         for option in entropies_for_feature.values():
             if isinstance(option, dict):
                 option_count = option['ttl_count_for_option']
                 option_entropy = option['entropy']
-                ttl_feature_gain -= (option_count / self.ttl_examples) * option_entropy
+                ttl_feature_gain -= (option_count / entropies_for_feature['ttl_count_for_feature']) * option_entropy #TODO:??????????????? update
         return ttl_feature_gain
 
     def calc_entropies_for_all(self, features, examples):
@@ -194,6 +209,10 @@ class Classifier:
             all_entropies[feature] = self.get_entropies_for_feature(feature, examples)
         return all_entropies
 
+    '''
+    split the entropies dict per feature and for each calculate and save gain
+    return dict[feature_name] -> gain
+    '''
     def calc_gain_for_all(self, features, examples):
         new_entropies = self.calc_entropies_for_all(features, examples)
         info_gains = {}
@@ -201,6 +220,11 @@ class Classifier:
             info_gains[feature] = self.get_gain_for_feature(entropies_for_feature=entropies)
         return info_gains
 
+    '''
+    Count amount of neg/pos examples per option per feature in given list of examples
+    input: examples = list of dict[feature_name][option]
+    output: dict[feature_name][option][count_neg_examples,count_pos_examples]
+    '''
     def count_features(self, examples):
         feature_options = {}
         for example in examples:
@@ -227,6 +251,10 @@ class Classifier:
         else:
             return 'no'
 
+    '''
+    once calculate all gains for all examples
+    send gains with all features to recursion func to further calculations on subtrees
+    '''
     def make_tree(self):
         features = list(self.count_dict.keys())
         self.all_entropies = self.calc_entropies_for_all(features, self.train_examples)
@@ -242,30 +270,36 @@ class Classifier:
         if len(set([example[self.feature_to_predict] for example in examples])) == 1:
             return Tree(value=examples[0][self.feature_to_predict])
         # No more features to split on
-        if len(info_gains) == 1:
-            predicted_feature_values = [example[self.feature_to_predict] for example in examples]
-            most_common_value = self.mode(predicted_feature_values)
-            return Tree(value=most_common_value)
+        # if len(info_gains) == 1:
+            # predicted_feature_values = [example[self.feature_to_predict] for example in examples]
+            # most_common_value = self.mode(predicted_feature_values)
+            # return Tree(value=most_common_value)
+            pass
 
-        best_feature = self.get_most_informative(info_gains)
+        best_feature = self.get_most_informative(info_gains) if len(features) > 1 else info_gains
 
         tree = Tree(feature=best_feature)
-
+        # get options for best feature out of relevant examples (branches)
         feature_values = set([example[best_feature] for example in examples])
 
         for option in feature_values:
             filtered_examples = [example for example in examples if example[best_feature] == option]
             predicted_feature_values = [example[self.feature_to_predict] for example in examples]
-            if len(filtered_examples) == 0:
-                # No examples with this feature value
+            if len(filtered_examples) == 0 or best_feature == info_gains:
+                # No examples with this option and that feature value or no more features to split on
                 most_common_value = self.mode(predicted_feature_values)
                 subtree = Tree(value=most_common_value)
             else:
+                # remove chosen feature, since deeper in the tree we already know its value (option)
                 if best_feature in features:
                     features.remove(best_feature)
-                updated_gains = self.calc_gain_for_all(features, filtered_examples)
                 default = self.mode(predicted_feature_values)
-                subtree = self.build_tree(filtered_examples, updated_gains, default, list(features))
+                if len(features) > 1:
+                    updated_gains = self.calc_gain_for_all(features, filtered_examples)
+                    subtree = self.build_tree(filtered_examples, updated_gains, default, list(features))
+                else:
+                    # Last feature left
+                    subtree = self.build_tree(filtered_examples, features[0], default, list(features))
             tree.add_child(option, subtree)
 
         return tree
@@ -284,10 +318,12 @@ def train_and_evaluate(train_data, test_data, out_tree_file, output):
 
 
 if __name__ == "__main__":
+    train_file = 'tennis_from_book.txt'
+    test_file = 'tennis_from_book.txt'
+    train_file = 'tennis_from_lecture.txt'
+    test_file = 'tennis_from_lecture.txt'
     train_file = 'train.txt'
     test_file = 'test.txt'
     out_tree = 'output_tree.txt'
     out = 'output.txt'
-
-
     train_and_evaluate(train_data=train_file, test_data=test_file, out_tree_file=out_tree, output=out)
