@@ -1,8 +1,8 @@
 import math
+from collections import OrderedDict
 
 import numpy as np
 
-np.random.seed(0)
 
 
 class NaiveBayes:
@@ -269,24 +269,18 @@ class Classifier:
         # All examples have the same classification - return classification
         if len(set([example[self.feature_to_predict] for example in examples])) == 1:
             return Tree(value=examples[0][self.feature_to_predict])
-        # No more features to split on
-        # if len(info_gains) == 1:
-            # predicted_feature_values = [example[self.feature_to_predict] for example in examples]
-            # most_common_value = self.mode(predicted_feature_values)
-            # return Tree(value=most_common_value)
-            pass
 
-        best_feature = self.get_most_informative(info_gains) if len(features) > 1 else info_gains
+        best_feature = self.get_most_informative(info_gains) if len(features) > 1 else next(iter(features))
 
         tree = Tree(feature=best_feature)
         # get options for best feature out of relevant examples (branches)
-        feature_values = set([example[best_feature] for example in examples])
+        feature_values = list(OrderedDict.fromkeys([example[best_feature] for example in examples]))
 
         for option in feature_values:
             filtered_examples = [example for example in examples if example[best_feature] == option]
             predicted_feature_values = [example[self.feature_to_predict] for example in examples]
-            if len(filtered_examples) == 0 or best_feature == info_gains:
-                # No examples with this option and that feature value or no more features to split on
+            if len(filtered_examples) == 0 or len(features) == 1:
+                # No examples for this option or no more features to split on
                 most_common_value = self.mode(predicted_feature_values)
                 subtree = Tree(value=most_common_value)
             else:
@@ -298,8 +292,8 @@ class Classifier:
                     updated_gains = self.calc_gain_for_all(features, filtered_examples)
                     subtree = self.build_tree(filtered_examples, updated_gains, default, list(features))
                 else:
-                    # Last feature left
-                    subtree = self.build_tree(filtered_examples, features[0], default, list(features))
+                    # Last feature left - no need to recalculate gains
+                    subtree = self.build_tree(filtered_examples, info_gains.pop(best_feature), default, list(features))
             tree.add_child(option, subtree)
 
         return tree
@@ -322,7 +316,7 @@ if __name__ == "__main__":
     test_file = 'tennis_from_book.txt'
     train_file = 'tennis_from_lecture.txt'
     test_file = 'tennis_from_lecture.txt'
-    train_file = 'train.txt'
+    train_file = 'test.txt'
     test_file = 'test.txt'
     out_tree = 'output_tree.txt'
     out = 'output.txt'
